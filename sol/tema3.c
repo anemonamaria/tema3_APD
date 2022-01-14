@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define CONVERGENCE_COEF 100
 #define ROOT 0
 
 typedef struct clusters {
@@ -14,28 +15,38 @@ typedef struct clusters {
 } clusters;
 
 
-void readFromCluster(struct clusters *cluster, FILE *file) {
-	fscanf(file, "%d", &cluster->n);
-	cluster->neighb = malloc(sizeof(int) * cluster->n);
+void readFromCluster(struct clusters *cluster, int rank) {
+	FILE *fp;
+    char file_name[15];
+    sprintf(file_name, "./cluster%d.txt", rank);
 
+    fp = fopen(file_name, "r");
+	fscanf(fp, "%d", &cluster->n);
+	// printf("din functie\n");
+	cluster->neighb = malloc(sizeof(int) * cluster->n);
 	for(int i = 0; i < cluster->n; i++) {
-		fscanf(file, "%d", &cluster->neighb[i]);
+		fscanf(fp, "%d", &cluster->neighb[i]);
 	}
 }
 
 int iAmYourCoordinator(struct clusters *cluster, int rank) {
 	int coordinator = -1;
 	coordinator = rank;
-	int new_coordinator;
-	for(int i = 0; i < cluster->n; i++) {
-		MPI_Send(&coordinator, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
-		MPI_Recv(&new_coordinator, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	}
+	// for (int k = 0; k < CONVERGENCE_COEF; k++) {
+		for(int i = 0; i < cluster->n; ++i) {
+			MPI_Send(&coordinator, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
+			int new_coordinator;
+			MPI_Recv(&new_coordinator, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		}  // ?????? what at rcv?
+	// }
+	printf("intri?\n");
 
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	return new_coordinator;
+	return coordinator;
 }
+
+// todo de anuntat procesele copil cine este coordonatorul
+// todo de facut o functie care afiseaza topologia pentru procese
+// in momentul in care acesta o afla
 
 int main(int argc, char * argv[]) {
 	int rank, nProcesses, num_procs, leader;
@@ -51,25 +62,26 @@ int main(int argc, char * argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &nProcesses);
 
-
 	if (rank == ROOT) {
-		readFromCluster(cluster, fopen("cluster0.txt", "r"));
+		readFromCluster(cluster, rank);
+		// printf("\n%d\n", cluster->n);
 		coordinator = iAmYourCoordinator(cluster, rank);
+		MPI_Barrier(MPI_COMM_WORLD);
+
 	}
 	else if (rank == 1) {
-		readFromCluster(cluster, fopen("cluster1.txt", "r"));
+		readFromCluster(cluster, rank);
+		// printf("\n%d\n", cluster->n);
 		coordinator = iAmYourCoordinator(cluster, rank);
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
 	else if (rank == 2) {
-		readFromCluster(cluster, fopen("cluster2.txt", "r"));
+		readFromCluster(cluster, rank);
+		// printf("\n%d\n", cluster->n);
 		coordinator = iAmYourCoordinator(cluster, rank);
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	if(rank == ROOT) {
-		printf("%d\n", cluster->n);
-	}
 	MPI_Finalize();
 	return 0;
 }
