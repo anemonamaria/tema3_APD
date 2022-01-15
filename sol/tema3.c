@@ -27,6 +27,7 @@ void readFromCluster(struct clusters *cluster, int rank) {
 	for(int i = 0; i < cluster->n; i++) {
 		fscanf(fp, "%d", &cluster->neighb[i]);
 	}
+
 }
 
 int main(int argc, char * argv[]) {
@@ -47,8 +48,10 @@ int main(int argc, char * argv[]) {
 	if (rank == ROOT) {
 		readFromCluster(cluster, rank);
 		MPI_Send(&rank, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD, &status);
 		printf("M(%d,%d)\n", rank, ROOT+1);
 		MPI_Send(&rank, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD, &status);
 		printf("M(%d,%d)\n", rank, ROOT+2);
 		leader = 0;
 		for(int i = 0; i < cluster->n; i++) {
@@ -59,8 +62,10 @@ int main(int argc, char * argv[]) {
 	if (rank == ROOT+1) {
 		readFromCluster(cluster, rank);
 		MPI_Send(&rank, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &status);
 		printf("M(%d,%d)\n", rank, ROOT);
 		MPI_Send(&rank, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD, &status);
 		printf("M(%d,%d)\n", rank, ROOT+2);
 		leader = 1;
 		for(int i = 0; i < cluster->n; i++) {
@@ -71,8 +76,10 @@ int main(int argc, char * argv[]) {
 	if (rank == ROOT+2) {
 		readFromCluster(cluster, rank);
 		MPI_Send(&rank, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD, &status);
 		printf("M(%d,%d)\n", rank, ROOT+1);
 		MPI_Send(&rank, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &status);
 		printf("M(%d,%d)\n", rank, ROOT);
 		leader = 2;
 		for(int i = 0; i < cluster->n; i++) {
@@ -81,13 +88,12 @@ int main(int argc, char * argv[]) {
 		}
 	}
 
-	//MPI_Barrier(MPI_COMM_WORLD);
 
 	// trimit fiecarui rank leader-ul sau
-	// if (rank != ROOT && rank != 1 && rank != 2)
-		MPI_Recv(&leader, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		// TODO de aici se buseste ceva, fara asta programul merge ok in continuare
-		// nu ajunge la linia 111
+	if (rank != ROOT && rank != 1 && rank != 2) {
+		MPI_Status status;
+		MPI_Recv(&leader, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+	}
 
 	// if(rank == 0) {
 	// 	for(int i = 0; i < cluster->n; i ++) {
@@ -97,7 +103,6 @@ int main(int argc, char * argv[]) {
 	// }   // ---> e bine
 
 		//printf("rank %d cluster %d leader\n", rank, leader);
-	// de ce nu te opresti de aici?!
 
 	// pentru topo
 	/*
@@ -106,7 +111,6 @@ int main(int argc, char * argv[]) {
 		in tot acest timp am afisat la termina M(sursa, destinatia)
 		si apoi afisam topologia
 	*/
-	printf("ajungi?");
 	MPI_Finalize();
 	return 0;
 }
