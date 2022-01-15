@@ -44,6 +44,29 @@ int iAmYourCoordinator(struct clusters *cluster, int rank) {
 	return coordinator;
 }
 
+int leader_chosing(struct clusters *cluster,int rank, int nProcesses) {
+	int leader = -1;
+	int q;
+	leader = rank;
+
+	for (int k = 0; k < CONVERGENCE_COEF; k++) {
+		for (int i = 0; i < cluster->n; ++i) {
+			MPI_Send(&leader, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
+			int new_leader;
+			MPI_Recv(&new_leader, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	printf("intri?\n");  //dc???     // MPI_ANY_SOURCE sau rank?
+
+			if (new_leader > leader)
+				leader = new_leader;
+		}
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	printf("%i/%i: leader is %i\n", rank, nProcesses, leader);
+
+	return leader;
+}
+
 // todo de anuntat procesele copil cine este coordonatorul
 // todo de facut o functie care afiseaza topologia pentru procese
 // in momentul in care acesta o afla
@@ -65,22 +88,27 @@ int main(int argc, char * argv[]) {
 	if (rank == ROOT) {
 		readFromCluster(cluster, rank);
 		// printf("\n%d\n", cluster->n);
-		coordinator = iAmYourCoordinator(cluster, rank);
-		MPI_Barrier(MPI_COMM_WORLD);
+		//coordinator = iAmYourCoordinator(cluster, rank);
+		// MPI_Barrier(MPI_COMM_WORLD);
+		leader = leader_chosing(cluster, rank, nProcesses);
 
 	}
 	else if (rank == 1) {
 		readFromCluster(cluster, rank);
 		// printf("\n%d\n", cluster->n);
-		coordinator = iAmYourCoordinator(cluster, rank);
-		MPI_Barrier(MPI_COMM_WORLD);
+		// coordinator = iAmYourCoordinator(cluster, rank);
+		// MPI_Barrier(MPI_COMM_WORLD);
+		leader = leader_chosing(cluster, rank, nProcesses);
 	}
 	else if (rank == 2) {
 		readFromCluster(cluster, rank);
 		// printf("\n%d\n", cluster->n);
-		coordinator = iAmYourCoordinator(cluster, rank);
-		MPI_Barrier(MPI_COMM_WORLD);
+		// coordinator = iAmYourCoordinator(cluster, rank);
+		// MPI_Barrier(MPI_COMM_WORLD);
+		leader = leader_chosing(cluster, rank, nProcesses);
 	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	MPI_Finalize();
 	return 0;
