@@ -22,54 +22,12 @@ void readFromCluster(struct clusters *cluster, int rank) {
 
     fp = fopen(file_name, "r");
 	fscanf(fp, "%d", &cluster->n);
-	// printf("din functie\n");
+
 	cluster->neighb = malloc(sizeof(int) * cluster->n);
 	for(int i = 0; i < cluster->n; i++) {
 		fscanf(fp, "%d", &cluster->neighb[i]);
 	}
 }
-
-int iAmYourCoordinator(struct clusters *cluster, int rank) {
-	int coordinator = -1;
-	coordinator = rank;
-	// for (int k = 0; k < CONVERGENCE_COEF; k++) {
-		for(int i = 0; i < cluster->n; ++i) {
-			MPI_Send(&coordinator, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
-			int new_coordinator;
-			MPI_Recv(&new_coordinator, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		}  // ?????? what at rcv?
-	// }
-	printf("intri?\n");
-
-	return coordinator;
-}
-
-int leader_chosing(struct clusters *cluster,int rank, int nProcesses) {
-	int leader = -1;
-	int q;
-	leader = rank;
-
-	for (int k = 0; k < CONVERGENCE_COEF; k++) {
-		for (int i = 0; i < cluster->n; ++i) {
-			MPI_Send(&leader, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
-			int new_leader;
-			MPI_Recv(&new_leader, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	printf("intri?\n");  //dc???     // MPI_ANY_SOURCE sau rank?
-
-			if (new_leader > leader)
-				leader = new_leader;
-		}
-	}
-
-	MPI_Barrier(MPI_COMM_WORLD);
-	printf("%i/%i: leader is %i\n", rank, nProcesses, leader);
-
-	return leader;
-}
-
-// todo de anuntat procesele copil cine este coordonatorul
-// todo de facut o functie care afiseaza topologia pentru procese
-// in momentul in care acesta o afla
 
 int main(int argc, char * argv[]) {
 	int rank, nProcesses, num_procs, leader;
@@ -85,31 +43,70 @@ int main(int argc, char * argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &nProcesses);
 
+	// citit, mesaje, topo
 	if (rank == ROOT) {
 		readFromCluster(cluster, rank);
-		// printf("\n%d\n", cluster->n);
-		//coordinator = iAmYourCoordinator(cluster, rank);
-		// MPI_Barrier(MPI_COMM_WORLD);
-		leader = leader_chosing(cluster, rank, nProcesses);
-
+		MPI_Send(&rank, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD);
+		printf("M(%d,%d)\n", rank, ROOT+1);
+		MPI_Send(&rank, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD);
+		printf("M(%d,%d)\n", rank, ROOT+2);
+		leader = 0;
+		for(int i = 0; i < cluster->n; i++) {
+			MPI_Send(&rank, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
+			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
+		}
 	}
-	else if (rank == 1) {
+	if (rank == ROOT+1) {
 		readFromCluster(cluster, rank);
-		// printf("\n%d\n", cluster->n);
-		// coordinator = iAmYourCoordinator(cluster, rank);
-		// MPI_Barrier(MPI_COMM_WORLD);
-		leader = leader_chosing(cluster, rank, nProcesses);
+		MPI_Send(&rank, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+		printf("M(%d,%d)\n", rank, ROOT);
+		MPI_Send(&rank, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD);
+		printf("M(%d,%d)\n", rank, ROOT+2);
+		leader = 1;
+		for(int i = 0; i < cluster->n; i++) {
+			MPI_Send(&rank, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
+			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
+		}
 	}
-	else if (rank == 2) {
+	if (rank == ROOT+2) {
 		readFromCluster(cluster, rank);
-		// printf("\n%d\n", cluster->n);
-		// coordinator = iAmYourCoordinator(cluster, rank);
-		// MPI_Barrier(MPI_COMM_WORLD);
-		leader = leader_chosing(cluster, rank, nProcesses);
+		MPI_Send(&rank, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD);
+		printf("M(%d,%d)\n", rank, ROOT+1);
+		MPI_Send(&rank, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+		printf("M(%d,%d)\n", rank, ROOT);
+		leader = 2;
+		for(int i = 0; i < cluster->n; i++) {
+			MPI_Send(&rank, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
+			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
+		}
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
+	//MPI_Barrier(MPI_COMM_WORLD);
 
+	// trimit fiecarui rank leader-ul sau
+	// if (rank != ROOT && rank != 1 && rank != 2)
+		MPI_Recv(&leader, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		// TODO de aici se buseste ceva, fara asta programul merge ok in continuare
+		// nu ajunge la linia 111
+
+	// if(rank == 0) {
+	// 	for(int i = 0; i < cluster->n; i ++) {
+	// 		printf("%d ", cluster->neighb[i]);
+	// 	}
+	// 	printf("\n");
+	// }   // ---> e bine
+
+		//printf("rank %d cluster %d leader\n", rank, leader);
+	// de ce nu te opresti de aici?!
+
+	// pentru topo
+	/*
+		prima data realizam comunicarea intre coordonatori
+		apoi realizam comunicarea intre copii si comunicatori si invers
+		in tot acest timp am afisat la termina M(sursa, destinatia)
+		si apoi afisam topologia
+	*/
+	printf("ajungi?");
 	MPI_Finalize();
 	return 0;
 }
