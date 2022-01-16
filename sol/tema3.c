@@ -6,7 +6,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define CONVERGENCE_COEF 100
 #define ROOT 0
 
 typedef struct clusters {
@@ -27,7 +26,10 @@ void readFromCluster(struct clusters *cluster, int rank) {
 	for(int i = 0; i < cluster->n; i++) {
 		fscanf(fp, "%d", &cluster->neighb[i]);
 	}
+}
 
+int cmpfunc (const void * a, const void * b) {
+   return ( *(int*)a - *(int*)b );
 }
 
 int main(int argc, char * argv[]) {
@@ -58,22 +60,20 @@ int main(int argc, char * argv[]) {
 			MPI_Send(&rank, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
 		}
-	}
-	if (rank == ROOT+1) {
+	} else if (rank == ROOT+1) {
 		readFromCluster(cluster, rank);
 		MPI_Send(&rank, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
-		MPI_Recv(&leader, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &status);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		printf("M(%d,%d)\n", rank, ROOT);
 		MPI_Send(&rank, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD);
-		MPI_Recv(&leader, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD, &status);
+		MPI_Recv(&leader, 1, MPI_INT, ROOT+2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		printf("M(%d,%d)\n", rank, ROOT+2);
 		leader = 1;
 		for(int i = 0; i < cluster->n; i++) {
 			MPI_Send(&rank, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
 		}
-	}
-	if (rank == ROOT+2) {
+	} else if (rank == ROOT+2) {
 		readFromCluster(cluster, rank);
 		MPI_Send(&rank, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD);
 		MPI_Recv(&leader, 1, MPI_INT, ROOT+1, 0, MPI_COMM_WORLD, &status);
@@ -86,58 +86,19 @@ int main(int argc, char * argv[]) {
 			MPI_Send(&rank, 1, MPI_INT, cluster->neighb[i], 0, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
 		}
+	} else {
+		// trimit fiecarui rank leader-ul sau
+		MPI_Recv(&leader, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
-	// trimit fiecarui rank leader-ul sau
-	if (rank != ROOT && rank != 1 && rank != 2) {
-		MPI_Status status;
-		MPI_Recv(&leader, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-	}
-
-	// printf("%d ->", rank);
 	struct clusters **duplicate_cluster = (struct clusters **)malloc(sizeof(struct clusters*) * 3);
 	for (int i = 0; i < 3; i ++) {
 		duplicate_cluster[i] = (struct clusters *)malloc(sizeof(struct clusters));
 	}
 
-
-	// trimit fiecarui copil dimensiunea vectorului liderului din care face parte
-	int size_sent;
-	int *v_recv;
-	if(rank == ROOT || rank == 1 || rank == 2) {
-		for(int i = 0; i < cluster->n; i++) {
-			MPI_Send(&cluster->n, 1, MPI_INT, cluster->neighb[i], 2, MPI_COMM_WORLD);
-			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
-		}
-		duplicate_cluster[rank]->n = cluster->n;
-		duplicate_cluster[rank]->neighb = (int *)calloc(sizeof(int), duplicate_cluster[rank]->n);
-	}
-
-	if (rank != ROOT && rank != 1 && rank != 2) {
-		MPI_Status status;
-		MPI_Recv(&duplicate_cluster[leader]->n, 1, MPI_INT, MPI_ANY_SOURCE, 2,
-					MPI_COMM_WORLD, &status);
-	}
-
-	// trimit fiecarui copil vectorul liderului din care face parte
-	if(rank == ROOT || rank == 1 || rank == 2) {
-		for(int i = 0; i < cluster->n; i++) {
-			MPI_Send(cluster->neighb, cluster->n, MPI_INT, cluster->neighb[i], 0,
-					 MPI_COMM_WORLD);
-			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
-		}
-		duplicate_cluster[rank]->neighb = cluster->neighb;
-	}
-
-	if (rank != ROOT && rank != 1 && rank != 2) {
-		MPI_Status status;
-		MPI_Recv(duplicate_cluster[leader]->neighb, duplicate_cluster[leader]->n, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-	}
-
 	// trimit celorlalti copii informatiile despre un vector din alt coordonator
 	// si retin dimensiunea vectorilor
 	if(rank == ROOT) {
-		// TODO de ce se schimba dimesniunea lui duplicate_cluster[ROOT+2]->n ?!
 		// retin dimensiunea vectorului
 		MPI_Send(&cluster->n, 1, MPI_INT, ROOT+1, 2, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT+1);
@@ -147,36 +108,19 @@ int main(int argc, char * argv[]) {
 		printf("M(%d,%d)\n", rank, ROOT+2);
 		MPI_Recv(&duplicate_cluster[ROOT+2]->n, 1, MPI_INT, ROOT+2, 2, MPI_COMM_WORLD,
 			MPI_STATUS_IGNORE);
-			printf("asta e n %d din root\n", duplicate_cluster[ROOT+2]->n);
 		// retin vectorul
 		MPI_Send(cluster->neighb, cluster->n, MPI_INT, ROOT+1, 3, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT+1);
+		duplicate_cluster[ROOT+1]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[ROOT+1]->n);
 		MPI_Recv(duplicate_cluster[ROOT+1]->neighb, duplicate_cluster[ROOT+1]->n,
 			MPI_INT, ROOT+1, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		// for(int i = 0; i < duplicate_cluster[ROOT+1]->n; i++) {
-		// 	printf("%d ", duplicate_cluster[ROOT+1]->neighb[i]);
-		// }  ---> asta pt root+1 este retinuta bine
-		//printf("\n");
 		MPI_Send(cluster->neighb, cluster->n, MPI_INT, ROOT+2, 3, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT+2);
+
 		duplicate_cluster[ROOT+2]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[ROOT+2]->n);
 		MPI_Recv(duplicate_cluster[ROOT+2]->neighb, duplicate_cluster[ROOT+2]->n,
 			MPI_INT, ROOT+2, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			// TODO de ce retine alta valoare?
-		printf("asta e n %d tot din root dar mai jos\n", duplicate_cluster[ROOT+2]->n);
-		// TODO  de ce nu sunt retinuti ok vectorii astia?!
-		// for(int i = 0; i < duplicate_cluster[ROOT+2]->n; i++) {
-		// 	printf("%d ", duplicate_cluster[ROOT+2]->neighb[i]);
-		// }
-		// printf("\n");
-		// for(int i = 0; i < duplicate_cluster[ROOT]->n; i++) {
-		// 	printf("%d ", duplicate_cluster[ROOT]->neighb[i]);
-		// }
-		// printf("\n");
-		// for(int i = 0; i < duplicate_cluster[ROOT+1]->n; i++) {
-		// 	printf("%d ", duplicate_cluster[ROOT+1]->neighb[i]);
-		// }
-		// printf("\n");  ---> aici nu mai este retinuta ok
+
 	}
 	// astea sunt verificate, n-ul din duplicate pt oricare root0/1/2 este retinnut bine
 	if(rank == ROOT+1) {
@@ -189,29 +133,18 @@ int main(int argc, char * argv[]) {
 		printf("M(%d,%d)\n", rank, ROOT+2);
 		MPI_Recv(&duplicate_cluster[ROOT+2]->n, 1, MPI_INT, ROOT+2, 2, MPI_COMM_WORLD,
 			MPI_STATUS_IGNORE);
-			printf("asta e n %d din root+1\n", duplicate_cluster[ROOT+2]->n);
 
 		// retin vectorul
 		MPI_Send(cluster->neighb, cluster->n, MPI_INT, ROOT, 3, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT);
+		duplicate_cluster[ROOT]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[ROOT]->n);
 		MPI_Recv(duplicate_cluster[ROOT]->neighb, duplicate_cluster[ROOT]->n,
 			MPI_INT, ROOT, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		MPI_Send(cluster->neighb, cluster->n, MPI_INT, ROOT+2, 3, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT+2);
+		duplicate_cluster[ROOT+2]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[ROOT+2]->n);
 		MPI_Recv(duplicate_cluster[ROOT+2]->neighb, duplicate_cluster[ROOT+2]->n,
 			MPI_INT, ROOT+2, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		// for(int i = 0; i < duplicate_cluster[ROOT+2]->n; i++) {
-		// 	printf("%d ", duplicate_cluster[ROOT+2]->neighb[i]);
-		// }
-		// printf("\n");
-		// for(int i = 0; i < duplicate_cluster[ROOT]->n; i++) {
-		// 	printf("%d ", duplicate_cluster[ROOT]->neighb[i]);
-		// }
-		// printf("\n");
-		// for(int i = 0; i < duplicate_cluster[ROOT+1]->n; i++) {  // TODO asta da eroare .. dc?!
-		// 	printf("%d ", duplicate_cluster[ROOT+1]->neighb[i]);
-		// }
-		// printf("\n");
 	}
 
 	if(rank == ROOT+2) {
@@ -227,6 +160,7 @@ int main(int argc, char * argv[]) {
 		// retin vectorul
 		MPI_Send(cluster->neighb, cluster->n, MPI_INT, ROOT, 3, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT);
+		duplicate_cluster[ROOT]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[ROOT]->n);
 		MPI_Recv(duplicate_cluster[ROOT]->neighb, duplicate_cluster[ROOT]->n,
 			MPI_INT, ROOT, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		MPI_Send(cluster->neighb, cluster->n, MPI_INT, ROOT+1, 3, MPI_COMM_WORLD);
@@ -234,52 +168,59 @@ int main(int argc, char * argv[]) {
 		duplicate_cluster[ROOT+1]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[ROOT+1]->n);
 		MPI_Recv(duplicate_cluster[ROOT+1]->neighb, duplicate_cluster[ROOT+1]->n,
 			MPI_INT, ROOT+1, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		for(int i = 0; i < duplicate_cluster[ROOT+2]->n; i++) {
-			printf("%d ", duplicate_cluster[ROOT+2]->neighb[i]);
-		}
-		printf("\n");
-		for(int i = 0; i < duplicate_cluster[ROOT]->n; i++) {  // TODO asta de ce e retinuta prost!?
-			printf("%d ", duplicate_cluster[ROOT]->neighb[i]);
-		}
-		printf("\n");
-		for(int i = 0; i < duplicate_cluster[ROOT+1]->n; i++) {  // TODO asta da eroare .. dc?!
-			printf("%d ", duplicate_cluster[ROOT+1]->neighb[i]);
-		}
-		printf("\n");
 	}
 
-	// if(rank == 1) {
-	// 	for(int i = 0; i < duplicate_cluster[0]->n; i++) {
-	// 		printf("%d ", duplicate_cluster[0]->neighb[i]);
-	// 	}
-	// 	printf("\n");
-	// 	for(int i = 0; i < duplicate_cluster[1]->n; i++) {
-	// 		printf("%d ", duplicate_cluster[1]->neighb[i]); // nu retii ce trebuie?!
-	// 	}
-	// 	printf("\n");
-	// 	for(int i = 0; i < duplicate_cluster[2]->n; i++) {
-	// 		printf("%d ", duplicate_cluster[2]->neighb[i]);
-	// 	}
-	// 	printf("\n");
-	// }
-	// printf("\n");
+	if (rank <= 2) {
+		for (int i = 0; i < 3; i++)
+			qsort(duplicate_cluster[i]->neighb, duplicate_cluster[i]->n, sizeof(int), cmpfunc);
+	}
 
-	// if(rank == 0) {
-	// 	for(int i = 0; i < cluster->n; i ++) {
-	// 		printf("%d ", cluster->neighb[i]);
-	// 	}
-	// 	printf("\n");
-	// }   // ---> e bine
+	// trimit fiecarui copil dimensiunea vectorului liderului din care face parte
+	if(rank == ROOT || rank == 1 || rank == 2) {
+		duplicate_cluster[rank]->n = cluster->n;
+		duplicate_cluster[rank]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[rank]->n);
+		for(int i = 0; i < cluster->n; i++) {
+			duplicate_cluster[rank]->neighb[i] = cluster->neighb[i];
+		}
 
-		//printf("rank %d cluster %d leader\n", rank, leader);
+		for(int j = 0; j < 3; j++) {
+			for(int i = 0; i < cluster->n; i++) {
+				MPI_Send(&duplicate_cluster[j]->n, 1, MPI_INT, cluster->neighb[i], 2, MPI_COMM_WORLD);
+				printf("M(%d,%d)\n", rank, cluster->neighb[i]);
+			}
+		}
+	} else {
+		for(int j = 0; j < 3; j++) {
+			MPI_Recv(&duplicate_cluster[j]->n, 1, MPI_INT, leader,
+						2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			duplicate_cluster[j]->neighb = (int *)malloc(sizeof(int) * duplicate_cluster[j]->n);
+		}
+	}
 
-	// pentru topo
-	/*
-		prima data realizam comunicarea intre coordonatori
-		apoi realizam comunicarea intre copii si comunicatori si invers
-		in tot acest timp am afisat la termina M(sursa, destinatia)
-		si apoi afisam topologia
-	*/
+	// trimit fiecarui copil vectorul liderului din care face parte
+	if(rank == ROOT || rank == 1 || rank == 2) {
+		for(int j = 0; j < 3; j++) {
+			for(int i = 0; i < cluster->n; i++) {
+				MPI_Send(duplicate_cluster[j]->neighb, duplicate_cluster[j]->n, MPI_INT, cluster->neighb[i], 0,
+						 MPI_COMM_WORLD);
+				printf("M(%d,%d)\n", rank, cluster->neighb[i]);
+			}
+		}
+	} else {
+		for(int j = 0; j < 3; j++)
+			MPI_Recv(duplicate_cluster[j]->neighb, duplicate_cluster[j]->n, MPI_INT, leader,
+				 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	}
+
+	printf("%d ->", rank);
+	for (int j = 0; j < 3; j++) {
+		printf(" %d:", j);
+		printf("%d", duplicate_cluster[j]->neighb[0]);
+		for(int i = 1; i < duplicate_cluster[j]->n; i++)
+			printf(",%d", duplicate_cluster[j]->neighb[i]);
+	}
+	printf("\n");
+
 	MPI_Finalize();
 	return 0;
 }
