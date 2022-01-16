@@ -1,1 +1,22 @@
 Moraru Anemona Maria 333CC
+
+ALGORITMI PARALELI SI DISTRIBUITI
+Tema #3 Calcule colaborative in sisteme distribuite
+
+Ianuarie 2022
+
+Aceasta tema a durat aproximativ doua zile, realizand doar prima parte a ei.
+Initial coordonatorii citesc din fisiere workerii pe care ii vor retine in
+structuri ce contin vectorul de workeri precum si numarul acestora si realizez
+comunicatiile dintre coordonatori (0-1, 0-2, 1-2), dar totodata anunt si
+workerii respectivi cine este leader-ul.
+Urmatorul pas este sa ne facem un 'vector' de structuri in care voi retine
+pentru fiecare rank toate informatiile din retea.
+Pentru fiecare proces coordonator voi trimite informatii despre workerii sai
+celorlalte procese coordonator si le voi retine in vectorul de structuri. In
+acest moment toti coordonatorii au strans informatii despre toti workerii din
+retea, urmatorul lucru pe care il vom face este sa sortam crescator vectorii
+de procese worker ca mai apoi sa putem trimite tutror rank-urilor niste
+informatii gata de a fi afisate in output, fara nicio alta modificare. Toate
+procesele vor fi anuntate de catre leader-ul lor de topologia completa din
+retea, topologie care va fi afisata in terminal.
