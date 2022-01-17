@@ -231,7 +231,11 @@ int main(int argc, char * argv[]) {
 	for (int i = 0; i < 3; i++) {
 		nrOfWorkers += duplicate_cluster[i]->n;
 	}
-
+	int *sizeVect = (int *)malloc(sizeof(int) * 3);
+	for(int i = 0; i < 2; i++) {
+		sizeVect[i] = n / nrOfWorkers * duplicate_cluster[i]->n;
+	}
+	sizeVect[2] = n - sizeVect[0] - sizeVect[1];
 	if (rank == ROOT) {
 		// generez vectorul pentru dublat
 		int *v = (int *)malloc(sizeof(int) * n);
@@ -239,79 +243,50 @@ int main(int argc, char * argv[]) {
 		for (int i = 0; i < n; i++) {
 			v[i] = i;
 		}
-		processCalc = (int *)malloc(sizeof(int) * n / nrOfWorkers * duplicate_cluster[rank]->n);
+		processCalc = (int *)malloc(sizeof(int) * sizeVect[0]);
 		// trimit catre procesele coordonator vectorul spart in bucati
 		// catre el insusi initializez pur si simplu vectorul
-		int sizeVect = n / nrOfWorkers * duplicate_cluster[rank]->n;
-		for(int i = 0; i < sizeVect; i++) {
+		for(int i = 0; i < sizeVect[0]; i++) {
 			processCalc[i] = v[position + i];
 		}
-		position = position + sizeVect;
+		position = position + sizeVect[0];
 
 		// rank = 1
-		int sizeVect1 = n / nrOfWorkers * duplicate_cluster[rank+1]->n;
-		int *toSend1 = (int *)malloc(sizeof(int) * sizeVect1);
-		for(int i = 0; i < sizeVect1; i++) {
+		int *toSend1 = (int *)malloc(sizeof(int) * sizeVect[1]);
+		for(int i = 0; i < sizeVect[1]; i++) {
 			toSend1[i] = v[position + i];
 		}
-		position = position + sizeVect1;
-		MPI_Send(toSend1, sizeVect1, MPI_INT, ROOT+1, 4, MPI_COMM_WORLD);
+		position = position + sizeVect[1];
+		MPI_Send(toSend1, sizeVect[1], MPI_INT, ROOT+1, 4, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT+1);
-		// MPI_Recv(received1, duplicate_cluster[rank+1]->n, MPI_INT, ROOT+1, 5, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 		// rank = 2
-		int sizeVect2 = n / nrOfWorkers * duplicate_cluster[rank+2]->n;
-		int *toSend2 = (int *)malloc(sizeof(int) * sizeVect2);
-		int *received2 = (int *)malloc(sizeof(int) * sizeVect2);
-		for(int i = 0; i < sizeVect2; i++) {
+		int *toSend2 = (int *)malloc(sizeof(int) * sizeVect[2]);
+		int *received2 = (int *)malloc(sizeof(int) * sizeVect[2]);
+		for(int i = 0; i < sizeVect[2]; i++) {
 			toSend2[i] = v[position + i];
 		}
-		position = position + sizeVect2;
-		MPI_Send(toSend2, sizeVect2, MPI_INT, ROOT+2, 4, MPI_COMM_WORLD);
+		position = position + sizeVect[2];
+		MPI_Send(toSend2, sizeVect[2], MPI_INT, ROOT+2, 4, MPI_COMM_WORLD);
 		printf("M(%d,%d)\n", rank, ROOT+2);
-		// MPI_Recv(received1, duplicate_cluster[rank+2]->n, MPI_INT, ROOT+2, 5, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		// for(int i = 0; i < sizeVect; i++) {
-			// processCalc[i] = processCalc[i];
-			// printf("%d ", processCalc[i]);
-		// }
-		// printf(" procesele din root\n");
-
 	}
 
 	if(rank == ROOT + 1) {
 		// primim info de calculat si trimitem inapoi calculele
-		int sizeVect1 = n / nrOfWorkers * duplicate_cluster[rank]->n;
-		processCalc = (int *)malloc(sizeof(int) * sizeVect1);
-		MPI_Recv(processCalc, sizeVect1, MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		// for(int i = 0; i < sizeVect1; i++) {
-			// processCalc[i] = processCalc[i];
-			// printf("%d ", processCalc[i]);
-		// }
-		// printf(" procesele din root+1\n");
-
-		//MPI_Send(processCalc, duplicate_cluster[rank]->n, MPI_INT, ROOT, 5, MPI_COMM_WORLD);
-		//printf("M(%d,%d)\n", rank, ROOT);
+		processCalc = (int *)malloc(sizeof(int) * sizeVect[1]);
+		MPI_Recv(processCalc, sizeVect[1], MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
 	if(rank == ROOT + 2) {
 		// primim info de calculat si trimitem inapoi calculele
-		int sizeVect2 = n / nrOfWorkers * duplicate_cluster[rank]->n;
-		processCalc = (int *)malloc(sizeof(int) * sizeVect2);
-		MPI_Recv(processCalc, sizeVect2, MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		// for(int i = 0; i < sizeVect2; i++) {
-			// processCalc[i] = processCalc[i];
-			// printf("%d ", processCalc[i]);
-		// }
-		// printf(" procesele din root+2\n");
-
-		// MPI_Send(processCalc, duplicate_cluster[rank]->n, MPI_INT, ROOT, 5, MPI_COMM_WORLD);
-		// printf("M(%d,%d)\n", rank, ROOT);
+		processCalc = (int *)malloc(sizeof(int) * sizeVect[2]);
+		MPI_Recv(processCalc, sizeVect[2], MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
 	// trimit copiilor vectorul pe care il au de duplicat
 	int *vect_to_duplicate;
 	int size;
-	if(rank == ROOT || rank == ROOT+1 || rank == ROOT+2) {
+	if(rank == ROOT || rank == ROOT+1) {
 		size = n / nrOfWorkers;
 		vect_to_duplicate = (int *)malloc(sizeof(int) * size);
 		for(int i = 0; i < cluster->n; i++) {
@@ -319,14 +294,22 @@ int main(int argc, char * argv[]) {
 			MPI_Send(&size, 1, MPI_INT, cluster->neighb[i], 6, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
 		}
-	} else {
+	} else if (rank == ROOT+2 ) {
+		size = n - 2 *n / nrOfWorkers  + 1;
+		vect_to_duplicate = (int *)malloc(sizeof(int) * size);
+		for(int i = 0; i < cluster->n; i++) {
+			// dimensiunea vectorului
+			MPI_Send(&size, 1, MPI_INT, cluster->neighb[i], 6, MPI_COMM_WORLD);
+			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
+		}
+	}
+	else {
 		MPI_Recv(&size, 1, MPI_INT, leader, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
 	// am spart vectorul de duplicat si il trimit catre workeri pentru a fi procesat
-	if(rank == ROOT || rank == ROOT+1 || rank == ROOT+2) {
+	if(rank == ROOT || rank == ROOT+1) {
 		int pos = 0;
-		int sizeBig =  n / nrOfWorkers * duplicate_cluster[rank]->n;
 		for(int i = 0; i < cluster->n; i++) {
 			// vectorul de duplicat
 			for (int j = 0; j < size; j++) {
@@ -336,7 +319,20 @@ int main(int argc, char * argv[]) {
 			MPI_Send(vect_to_duplicate, size, MPI_INT, cluster->neighb[i], 6, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
 		}
-	} else {
+	} else if (rank == ROOT+2) {
+		int pos = 0;
+
+		for(int i = 0; i < cluster->n; i++) {
+			for (int j = 0; j < size; j++) {
+				vect_to_duplicate[j] = processCalc[pos + j];
+			}
+
+			pos = pos + size;
+			MPI_Send(vect_to_duplicate, size, MPI_INT, cluster->neighb[i], 6, MPI_COMM_WORLD);
+			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
+		}
+	}
+	else {
 		vect_to_duplicate = (int *)malloc(sizeof(int) * size);
 		MPI_Recv(vect_to_duplicate, size, MPI_INT, leader, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		for(int i = 0; i < size; i ++) {
@@ -352,7 +348,7 @@ int main(int argc, char * argv[]) {
 		for(int i = 0; i < size; i++) {
 			vect_to_duplicate[i] = 0;
 		}
-		for(int i =  0; i < n / nrOfWorkers * duplicate_cluster[rank]->n; i++) {
+		for(int i =  0; i < sizeVect[rank]; i++) {
 			processCalc[i] = 0;
 		}
 		srand(40);
@@ -367,56 +363,45 @@ int main(int argc, char * argv[]) {
 			}
 			pos = pos + size;
 		}
-		// for(int i =  0; i < n / nrOfWorkers * duplicate_cluster[rank]->n; i++) {
-		// 	printf("%d ", processCalc[i]);
-		// }
-		// printf("  dublate din rank %d\n", rank);
-		// trimitem catre rank-ul 0 ultimele fractiuni pentru asamblare
+
 		if(rank != 0) {
-			MPI_Send(processCalc, n / nrOfWorkers * duplicate_cluster[rank]->n, MPI_INT,
+			MPI_Send(processCalc, sizeVect[rank], MPI_INT,
 					 ROOT, 8, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, ROOT);
 			MPI_Recv(&randnr, 1, MPI_INT, ROOT, 8, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		} else {
 			// asamblez intregul vector
 			int *doubledVector = (int *)malloc(sizeof(int) * n);
-			// for (int i = 0; i < n; i++) {
-			// 	v[i] = 0;
-			// }
+
 			int pos = 0;
-			int *received1 = (int *)malloc(sizeof(int) * n / nrOfWorkers
-					* duplicate_cluster[ROOT+1]->n);
-			MPI_Recv(received1, n / nrOfWorkers * duplicate_cluster[ROOT+1]->n, MPI_INT,
+			int *received1 = (int *)malloc(sizeof(int) * sizeVect[1]);
+			MPI_Recv(received1, sizeVect[1], MPI_INT,
 					 ROOT+1, 8, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 			MPI_Send(&randnr, 1, MPI_INT, ROOT+1, 8, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, ROOT+1);
 
-			int *received2 = (int *)malloc(sizeof(int) * n / nrOfWorkers
-					* duplicate_cluster[ROOT+2]->n);
-			MPI_Recv(received2, n / nrOfWorkers * duplicate_cluster[ROOT+2]->n, MPI_INT,
+			int *received2 = (int *)malloc(sizeof(int) * sizeVect[2]);
+			MPI_Recv(received2, sizeVect[2], MPI_INT,
 					 ROOT+2, 8, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			// for(int i =  0; i < n / nrOfWorkers * duplicate_cluster[ROOT+2]->n; i++) {
-			// 	printf("%d ", received2[i]);
-			// }
-			// printf("  received din rank %d\n", rank);
+
 			MPI_Send(&randnr, 1, MPI_INT, ROOT+2, 8, MPI_COMM_WORLD);
 			printf("M(%d,%d)\n", rank, ROOT+2);
 
-			for(int i = 0; i < n / nrOfWorkers * duplicate_cluster[ROOT+1]->n; i++) {
+			for(int i = 0; i < sizeVect[1]; i++) {
 				doubledVector[pos + i] = received1[i];
 			}
-			pos = pos +  n / nrOfWorkers * duplicate_cluster[ROOT+1]->n;
+			pos = pos +  sizeVect[1];
 
-			for(int i = 0; i < n / nrOfWorkers * duplicate_cluster[ROOT+2]->n; i++) {
+			for(int i = 0; i < sizeVect[2]; i++) {
 				doubledVector[pos + i] = received2[i];
 			}
-			pos = pos +  n / nrOfWorkers * duplicate_cluster[ROOT+2]->n;
+			pos = pos +  sizeVect[2];
 
-			for(int i = 0; i < n / nrOfWorkers * duplicate_cluster[ROOT]->n; i++) {
+			for(int i = 0; i < sizeVect[0]; i++) {
 				doubledVector[pos + i] = processCalc[i];
 			}
-			pos = pos +  n / nrOfWorkers * duplicate_cluster[ROOT+1]->n;
+			pos = pos +  sizeVect[0];
 
 			qsort(doubledVector, n, sizeof(int), cmpfunc);
 			printf("Rezultat: ");
