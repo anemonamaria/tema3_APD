@@ -5,11 +5,11 @@ Tema #3 Calcule colaborative in sisteme distribuite
 
 Ianuarie 2022
 
-Aceasta tema a durat aproximativ doua zile, realizand doar prima parte a ei.
+Aceasta tema a durat aproximativ doua zile.
 Initial coordonatorii citesc din fisiere workerii pe care ii vor retine in
 structuri ce contin vectorul de workeri precum si numarul acestora si realizez
 comunicatiile dintre coordonatori (0-1, 0-2, 1-2), dar totodata anunt si
-workerii respectivi cine este leader-ul.
+workerii respectivi cine este leader-ul lor.
 Urmatorul pas este sa ne facem un 'vector' de structuri in care voi retine
 pentru fiecare rank toate informatiile din retea.
 Pentru fiecare proces coordonator voi trimite informatii despre workerii sai
@@ -20,3 +20,19 @@ de procese worker ca mai apoi sa putem trimite tutror rank-urilor niste
 informatii gata de a fi afisate in output, fara nicio alta modificare. Toate
 procesele vor fi anuntate de catre leader-ul lor de topologia completa din
 retea, topologie care va fi afisata in terminal.
+Pentru a doua parte a cerintei am ales sa impart in mod egal coordonatorilor
+numarul de iteratii printr-o formula simpla.
+Nr_total_iteratii / Nr_total_workeri * Nr_workeri_din_coordonator  --> formula
+folosita pentru primii doi coordonatori, iar pentru ultimul coordonator am
+ales sa scad din numarul total de iteratii iteratiile pe care am apucat sa le
+impart primilor doi deoarece in acest fel acopar cazul in care rezultatul nu
+se imparte exact.
+In procesul cu rang 0 imi generez vectorul pe care trebuie sa il dublez, apoi
+il impart in 3 subvectori de dimensiuni calculate anterior, vectori care vor
+fi trimisi proceselor coordonator din retea. Fiecare proces coordonator este
+apoi responsabil sa isi imparta in mod egal iteratiile catre workerii sai.
+Dupa ce workerii au realizat calculele procesul are loc in mod invers
+fata de cum am facut pana acum, practic reunim pe parcurs toate rezultatele.
+Coordonatorii vor afla calculele facute de workerii sai, apoi ei vor instiinta
+procesul 0.
+Inainte sa printam vectorul intreg, il ordonam crescator.

@@ -231,11 +231,14 @@ int main(int argc, char * argv[]) {
 	for (int i = 0; i < 3; i++) {
 		nrOfWorkers += duplicate_cluster[i]->n;
 	}
+	// realizez impartirea in mod egal, iar ce ramane va fi atribuit
+	// ultimului coordonator
 	int *sizeVect = (int *)malloc(sizeof(int) * 3);
 	for(int i = 0; i < 2; i++) {
 		sizeVect[i] = n / nrOfWorkers * duplicate_cluster[i]->n;
 	}
 	sizeVect[2] = n - sizeVect[0] - sizeVect[1];
+
 	if (rank == ROOT) {
 		// generez vectorul pentru dublat
 		int *v = (int *)malloc(sizeof(int) * n);
@@ -283,10 +286,11 @@ int main(int argc, char * argv[]) {
 		MPI_Recv(processCalc, sizeVect[2], MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
-	// trimit copiilor vectorul pe care il au de duplicat
+	// trimit workeri vectorul pe care il au de duplicat
 	int *vect_to_duplicate;
 	int size;
 	if(rank == ROOT || rank == ROOT+1) {
+		// primii 2 coordonatori au sigur acelasi nr de iteratii
 		size = n / nrOfWorkers;
 		vect_to_duplicate = (int *)malloc(sizeof(int) * size);
 		for(int i = 0; i < cluster->n; i++) {
@@ -304,6 +308,7 @@ int main(int argc, char * argv[]) {
 		}
 	}
 	else {
+		// workerii primesc dimensiunea iteratiilor
 		MPI_Recv(&size, 1, MPI_INT, leader, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
@@ -333,6 +338,7 @@ int main(int argc, char * argv[]) {
 		}
 	}
 	else {
+		// workerii primesc fragmentele de iteratii
 		vect_to_duplicate = (int *)malloc(sizeof(int) * size);
 		MPI_Recv(vect_to_duplicate, size, MPI_INT, leader, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		for(int i = 0; i < size; i ++) {
@@ -403,6 +409,7 @@ int main(int argc, char * argv[]) {
 			}
 			pos = pos +  sizeVect[0];
 
+			// sortez vectorul de iteratii si il afisez in terminal
 			qsort(doubledVector, n, sizeof(int), cmpfunc);
 			printf("Rezultat: ");
 			for(int i = 0; i < n; i++) {
