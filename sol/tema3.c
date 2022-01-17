@@ -233,7 +233,7 @@ int main(int argc, char * argv[]) {
 	}
 	// realizez impartirea in mod egal, iar ce ramane va fi atribuit
 	// ultimului coordonator
-	int *sizeVect = (int *)malloc(sizeof(int) * 3);
+	int sizeVect[3]; // = (int *)malloc(sizeof(int) * 3);
 	for(int i = 0; i < 2; i++) {
 		sizeVect[i] = n / nrOfWorkers * duplicate_cluster[i]->n;
 	}
@@ -274,16 +274,10 @@ int main(int argc, char * argv[]) {
 		printf("M(%d,%d)\n", rank, ROOT+2);
 	}
 
-	if(rank == ROOT + 1) {
+	if(rank == ROOT + 1 || rank == ROOT + 2) {
 		// primim info de calculat si trimitem inapoi calculele
-		processCalc = (int *)malloc(sizeof(int) * sizeVect[1]);
-		MPI_Recv(processCalc, sizeVect[1], MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	}
-
-	if(rank == ROOT + 2) {
-		// primim info de calculat si trimitem inapoi calculele
-		processCalc = (int *)malloc(sizeof(int) * sizeVect[2]);
-		MPI_Recv(processCalc, sizeVect[2], MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		processCalc = (int *)malloc(sizeof(int) * sizeVect[rank]);
+		MPI_Recv(processCalc, sizeVect[rank], MPI_INT, ROOT, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
 	// trimit workeri vectorul pe care il au de duplicat
@@ -299,7 +293,7 @@ int main(int argc, char * argv[]) {
 			printf("M(%d,%d)\n", rank, cluster->neighb[i]);
 		}
 	} else if (rank == ROOT+2 ) {
-		size = n - 2 *n / nrOfWorkers  + 1;
+		size = n - 2 * n / nrOfWorkers + 1;
 		vect_to_duplicate = (int *)malloc(sizeof(int) * size);
 		for(int i = 0; i < cluster->n; i++) {
 			// dimensiunea vectorului
@@ -416,7 +410,10 @@ int main(int argc, char * argv[]) {
 				printf("%d ", doubledVector[i]);
 			}
 			printf("\n");
-
+			free(doubledVector);
+			free(received1);
+			free(received2);
+			free(processCalc);
 		}
 
 	} else {
